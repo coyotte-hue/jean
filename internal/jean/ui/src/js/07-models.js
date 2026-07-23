@@ -317,22 +317,28 @@ function onHFPickFile(){
 }
 // Download a .gguf from Hugging Face, polling progress until done.
 let dlPoll = null;
+function setProgress(pct, text, ok){
+  const wrap = document.getElementById('m-hf-progress');
+  const bar = document.getElementById('m-hf-pbar');
+  const txt = document.getElementById('m-hf-pbar-text');
+  wrap.style.display = 'block';
+  bar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  bar.style.background = ok ? 'var(--ok)' : (pct>0 && pct<100 ? 'var(--accent)' : 'var(--err)');
+  txt.textContent = text || '';
+}
 async function startDownload(){
   let url = document.getElementById('m-hf-url').value.trim();
   if(!url){ toast('colle un lien .gguf ou une page Hugging Face'); return; }
-  // Si un fichier est sélectionné dans le picker HF, construire le lien direct
   const picker = document.getElementById('m-hf-picker');
   if(picker && picker.value){
     const base = url.replace(/\/?$/, '');
     url = base + '/resolve/main/' + picker.value;
   }
   const btn = document.getElementById('m-hf-btn');
-  const prog = document.getElementById('m-hf-progress');
+  setProgress(0, 'démarrage…');
   btn.disabled = true;
-  prog.style.display = 'block';
-  prog.textContent = 'démarrage…';
   const r = await jpost('/api/models/download', {url});
-  if(!r.ok){ prog.innerHTML = '<span style="color:var(--err)">erreur : '+(r.error||'')+'</span>'; btn.disabled=false; return; }
+  if(!r.ok){ setProgress(0, 'erreur : '+(r.error||'')); btn.disabled=false; return; }
   const fname = r.filename;
   if(dlPoll) clearInterval(dlPoll);
   dlPoll = setInterval(async ()=>{
@@ -340,19 +346,19 @@ async function startDownload(){
     const st = (list||[]).find(d=>d.filename===fname);
     if(!st){ return; }
     if(st.error){
-      prog.innerHTML = '<span style="color:var(--err)">erreur : '+st.error+'</span>';
+      setProgress(100, 'erreur : '+st.error);
       clearInterval(dlPoll); dlPoll=null; btn.disabled=false; return;
     }
     if(st.finished){
-      prog.innerHTML = '<span style="color:var(--ok)">✓ '+fname+' téléchargé ('+fmtSize(st.done)+')</span>';
+      setProgress(100, '✓ '+fname+' ('+fmtSize(st.done)+')', true);
       clearInterval(dlPoll); dlPoll=null; btn.disabled=false;
       await populateModelPicker();
       document.getElementById('m-model').value = fname; onPickModel();
       return;
     }
     const pct = st.total>0 ? Math.round(st.done*100/st.total) : 0;
-    const tot = st.total>0 ? ' / '+fmtSize(st.total)+' ('+pct+'%)' : '';
-    prog.textContent = '⬇ '+fmtSize(st.done)+tot+' — '+fname;
+    const tot = st.total>0 ? ' / '+fmtSize(st.total) : '';
+    setProgress(pct, fmtSize(st.done)+tot+' — '+fname);
   }, 800);
 }
 // Smart autoscroll: follow the bottom while the user hasn't manually scrolled

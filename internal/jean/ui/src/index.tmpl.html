@@ -248,7 +248,12 @@
           <div id="m-hf-files" style="display:none;margin-top:6px">
             <select id="m-hf-picker" class="ctl" onchange="onHFPickFile()"></select>
           </div>
-          <div id="m-hf-progress" class="fld-hint" style="display:none"></div>
+          <div id="m-hf-progress" style="display:none;margin-top:6px">
+            <div id="m-hf-pbar-bg" style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+              <div id="m-hf-pbar" style="background:var(--accent);width:0%;height:100%;border-radius:4px;transition:width .3s"></div>
+            </div>
+            <div id="m-hf-pbar-text" class="fld-hint" style="margin-top:3px"></div>
+          </div>
         </div>
 
         <div class="fld">
