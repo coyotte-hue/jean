@@ -346,6 +346,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .seg input{display:none}
 .seg .be-note{font-size:10px;color:var(--dim);margin:0}
 .btn-danger{background:var(--danger-bg);border-color:var(--err);color:var(--err);margin:0}
+.btn-danger-in{background:var(--danger-bg);border-color:var(--err);color:var(--err);margin:0;padding:9px 13px;border-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
+.btn-danger-in:hover{background:var(--err);color:#fff}
 .btn-save{border-color:var(--accent);color:var(--accent);margin:0}
 .del-model{align-items:center;gap:5px;font-size:11px;color:var(--dim)}
 .del-model input{margin:0}
@@ -569,7 +571,10 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
         <div class="fld">
           <label class="fld-l" for="m-model">Modèle <span class="opt">(remplace la ligne MODEL=)</span></label>
-          <select id="m-model" class="ctl" onchange="onPickModel()"></select>
+          <div class="input-btn">
+            <select id="m-model" class="ctl" onchange="onPickModel()"></select>
+            <button id="m-model-del" class="btn-in btn-danger-in" onclick="deleteModel()" title="Supprimer le modèle .gguf du disque">🗑</button>
+          </div>
         </div>
 
         <div class="fld">
@@ -1215,10 +1220,25 @@ function onPickModel(){
   if(/^\s*MODEL\s*=.*$/m.test(ta.value)){
     ta.value = ta.value.replace(/^\s*MODEL\s*=.*$/m, 'MODEL="'+val+'"');
   } else {
-    // No MODEL= line yet — prepend so it's visible at the top.
     ta.value = 'MODEL="'+val+'"\n' + ta.value;
   }
   toast('MODEL='+val);
+}
+async function deleteModel(){
+  const sel = document.getElementById('m-model');
+  const val = sel.value;
+  if(!val){ toast('aucun modèle sélectionné'); return; }
+  if(!await askConfirm('Supprimer définitivement le fichier .gguf « ' + val + ' » du disque ?', {title:'Supprimer le modèle', okText:'Supprimer', danger:true})) return;
+  const r = await jpost('/api/models/delete', {name: val});
+  if(!r.ok){ toast('erreur : ' + (r.error||'')); return; }
+  toast('modèle supprimé');
+  await populateModelPicker();
+  // Si le modèle supprimé était sélectionné dans le preset, on nettoie la ligne MODEL=
+  const ta = document.getElementById('m-content');
+  const cur = currentModelInTextarea();
+  if(cur === val){
+    ta.value = ta.value.replace(/^\s*MODEL\s*=.*$/m, '');
+  }
 }
 
 // Choix du moteur PAR MODÈLE : 3 options (rapide / optimisé / personnalisé)

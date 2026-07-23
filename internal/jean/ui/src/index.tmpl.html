@@ -233,7 +233,10 @@
 
         <div class="fld">
           <label class="fld-l" for="m-model">Modèle <span class="opt">(remplace la ligne MODEL=)</span></label>
-          <select id="m-model" class="ctl" onchange="onPickModel()"></select>
+          <div class="input-btn">
+            <select id="m-model" class="ctl" onchange="onPickModel()"></select>
+            <button id="m-model-del" class="btn-in btn-danger-in" onclick="deleteModel()" title="Supprimer le modèle .gguf du disque">🗑</button>
+          </div>
         </div>
 
         <div class="fld">

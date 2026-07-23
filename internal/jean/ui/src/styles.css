@@ -327,6 +327,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .seg input{display:none}
 .seg .be-note{font-size:10px;color:var(--dim);margin:0}
 .btn-danger{background:var(--danger-bg);border-color:var(--err);color:var(--err);margin:0}
+.btn-danger-in{background:var(--danger-bg);border-color:var(--err);color:var(--err);margin:0;padding:9px 13px;border-left:0;border-top-left-radius:0;border-bottom-left-radius:0}
+.btn-danger-in:hover{background:var(--err);color:#fff}
 .btn-save{border-color:var(--accent);color:var(--accent);margin:0}
 .del-model{align-items:center;gap:5px;font-size:11px;color:var(--dim)}
 .del-model input{margin:0}

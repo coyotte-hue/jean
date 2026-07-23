@@ -123,10 +123,25 @@ function onPickModel(){
   if(/^\s*MODEL\s*=.*$/m.test(ta.value)){
     ta.value = ta.value.replace(/^\s*MODEL\s*=.*$/m, 'MODEL="'+val+'"');
   } else {
-    // No MODEL= line yet — prepend so it's visible at the top.
     ta.value = 'MODEL="'+val+'"\n' + ta.value;
   }
   toast('MODEL='+val);
+}
+async function deleteModel(){
+  const sel = document.getElementById('m-model');
+  const val = sel.value;
+  if(!val){ toast('aucun modèle sélectionné'); return; }
+  if(!await askConfirm('Supprimer définitivement le fichier .gguf « ' + val + ' » du disque ?', {title:'Supprimer le modèle', okText:'Supprimer', danger:true})) return;
+  const r = await jpost('/api/models/delete', {name: val});
+  if(!r.ok){ toast('erreur : ' + (r.error||'')); return; }
+  toast('modèle supprimé');
+  await populateModelPicker();
+  // Si le modèle supprimé était sélectionné dans le preset, on nettoie la ligne MODEL=
+  const ta = document.getElementById('m-content');
+  const cur = currentModelInTextarea();
+  if(cur === val){
+    ta.value = ta.value.replace(/^\s*MODEL\s*=.*$/m, '');
+  }
 }
 
 // Choix du moteur PAR MODÈLE : 3 options (rapide / optimisé / personnalisé)
