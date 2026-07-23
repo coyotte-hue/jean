@@ -20,3 +20,4 @@ config.env
 Thumbs.db
 .idea/
 .vscode/
+*~
