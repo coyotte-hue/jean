@@ -347,6 +347,47 @@ func handleLlamacppUse(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, 200, map[string]any{"ok": true, "bin": bin})
 }
 
+// handleLlamacppDelete supprime un moteur installé (binaires + dossier).
+func handleLlamacppDelete(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Mode string `json:"mode"` // "fast" ou "opt"
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	var dir string
+	switch req.Mode {
+	case "fast":
+		dir = prebuiltDir()
+	case "opt":
+		dir = llamacppRepoDir()
+	default:
+		sendJSON(w, 400, map[string]any{"ok": false, "error": "mode inconnu (fast/opt)"})
+		return
+	}
+	if !isDir(dir) {
+		sendJSON(w, 400, map[string]any{"ok": false, "error": "ce moteur n'est pas installé"})
+		return
+	}
+	// Vérifie si le moteur est utilisé par la config courante et efface BIN le cas échéant.
+	cfgBin := ReadConfig()["BIN"]
+	engineBin := ""
+	if req.Mode == "fast" {
+		engineBin = prebuiltServerBin()
+	} else {
+		engineBin = llamaServerBin(dir)
+	}
+	if engineBin != "" && samePath(engineBin, cfgBin) {
+		if err := SetConfigKey("BIN", ""); err != nil {
+			sendJSON(w, 500, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		sendJSON(w, 500, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	sendJSON(w, 200, map[string]any{"ok": true})
+}
+
 // handleLlamacppJob renvoie l'état du job courant + les lignes de log depuis
 // l'offset absolu ?from=N (le client mémorise `next` et enchaîne).
 func handleLlamacppJob(w http.ResponseWriter, r *http.Request) {

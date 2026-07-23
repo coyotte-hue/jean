@@ -148,6 +148,77 @@ func handleModelDelete(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, 200, map[string]any{"ok": true})
 }
 
+// ---- Hugging Face API ------------------------------------------------------
+
+// hfFileInfo represents a .gguf file in a Hugging Face repo.
+type hfFileInfo struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+// repoID extracts the repo identifier from a HF model page URL.
+func repoID(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", fmt.Errorf("lien invalide: %v", err)
+	}
+	if !strings.Contains(u.Host, "huggingface.co") {
+		return "", fmt.Errorf("lien invalide: doit être un URL huggingface.co")
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("lien invalide: impossible d'extraire l'ID du repo")
+	}
+	return strings.Join(parts[:2], "/"), nil
+}
+
+// handleHFFiles lists .gguf files in a Hugging Face repo via the HF API.
+func handleHFFiles(w http.ResponseWriter, r *http.Request) {
+	repo := r.URL.Query().Get("repo")
+	if repo == "" {
+		sendJSON(w, 400, map[string]any{"ok": false, "error": "paramètre repo requis"})
+		return
+	}
+	apiURL := fmt.Sprintf("https://huggingface.co/api/models/%s/tree/main", url.PathEscape(repo))
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		sendJSON(w, 500, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	if k := os.Getenv("HF_TOKEN"); k != "" {
+		req.Header.Set("Authorization", "Bearer "+k)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		sendJSON(w, 502, map[string]any{"ok": false, "error": "impossible de joindre Hugging Face: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		sendJSON(w, 502, map[string]any{"ok": false, "error": fmt.Sprintf("Hugging Face a répondu HTTP %d", resp.StatusCode)})
+		return
+	}
+	var entries []struct {
+		Type string `json:"type"`
+		Path string `json:"rpath"`
+		Size int64  `json:"size"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		sendJSON(w, 502, map[string]any{"ok": false, "error": "réponse invalide de Hugging Face: " + err.Error()})
+		return
+	}
+	var out []hfFileInfo
+	for _, e := range entries {
+		if e.Type == "file" && strings.HasSuffix(strings.ToLower(e.Path), ".gguf") {
+			out = append(out, hfFileInfo{Name: path.Base(e.Path), Size: e.Size})
+		}
+	}
+	if out == nil {
+		out = []hfFileInfo{} // JSON [] not null
+	}
+	sendJSON(w, 200, out)
+}
+
 // ---- Hugging Face downloads -------------------------------------------------
 
 // dlState tracks a single in-flight (or finished) model download.

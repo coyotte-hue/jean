@@ -307,6 +307,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .lc-mode-active-tag{color:var(--accent);font-weight:600}
 .lc-update-link{color:var(--dim);text-decoration:underline;cursor:pointer}
 .lc-update-link:hover{color:var(--accent)}
+.lc-del-link{color:var(--err);text-decoration:underline;cursor:pointer;margin-left:8px;opacity:.7}
+.lc-del-link:hover{opacity:1}
 /* Choix du moteur dans l'éditeur de modèle (3 options : rapide/optimisé/perso) */
 .be-opts{display:flex;flex-direction:column;gap:7px;margin:6px 0 8px}
 .be-opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}
@@ -578,10 +580,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
         </div>
 
         <div class="fld">
-          <label class="fld-l" for="m-hf-url">Télécharger un modèle <span class="opt">(lien direct vers un .gguf)</span></label>
+          <label class="fld-l" for="m-hf-url">Télécharger un modèle <span class="opt">(lien .gguf direct ou page Hugging Face)</span></label>
           <div class="input-btn">
-            <input id="m-hf-url" class="ctl" placeholder="https://…/model.gguf">
+            <input id="m-hf-url" class="ctl" placeholder="https://huggingface.co/… ou lien .gguf direct" oninput="onHFUrlChange()">
             <button id="m-hf-btn" class="btn-in" onclick="startDownload()" title="Télécharger">⬇</button>
+          </div>
+          <div id="m-hf-files" style="display:none;margin-top:6px">
+            <select id="m-hf-picker" class="ctl" onchange="onHFPickFile()"></select>
           </div>
           <div id="m-hf-progress" class="fld-hint" style="display:none"></div>
         </div>
@@ -1364,11 +1369,65 @@ async function delItem(){
   } else { toast('supprimé'); }
   closeModal(); K.reload();
 }
+// Détecte si l'URL colle est une page de modèle HF (pas un lien .gguf direct).
+function isHFPageURL(url){
+  try{
+    const u = new URL(url);
+    return u.hostname.includes('huggingface.co') && !url.match(/\.gguf/i);
+  }catch(_){ return false; }
+}
+// Extrait l'ID du repo depuis une URL de page HF.
+function repoIDFromURL(url){
+  try{
+    const u = new URL(url);
+    return u.pathname.replace(/^\/|\/$/g, '');
+  }catch(_){ return ''; }
+}
+let hfFilesCache = [];
+async function onHFUrlChange(){
+  const url = document.getElementById('m-hf-url').value.trim();
+  const pickerWrap = document.getElementById('m-hf-files');
+  const picker = document.getElementById('m-hf-picker');
+  const btn = document.getElementById('m-hf-btn');
+  if(isHFPageURL(url)){
+    const repo = repoIDFromURL(url);
+    if(!repo){ pickerWrap.style.display='none'; return; }
+    btn.disabled = true;
+    picker.innerHTML = '<option>chargement…</option>';
+    pickerWrap.style.display = 'block';
+    const files = await jget('/api/models/hf-files?repo='+encodeURIComponent(repo));
+    if(!Array.isArray(files) || !files.length){
+      picker.innerHTML = '<option>aucun fichier .gguf trouvé</option>';
+      hfFilesCache = [];
+      return;
+    }
+    hfFilesCache = files;
+    let html = '<option value="">— choisir une quantization —</option>';
+    for(const f of files) html += '<option value="'+f.name+'">'+f.name+'  ('+fmtSize(f.size)+')</option>';
+    picker.innerHTML = html;
+    btn.disabled = true;
+  } else {
+    pickerWrap.style.display = 'none';
+    hfFilesCache = [];
+    btn.disabled = false;
+  }
+}
+function onHFPickFile(){
+  const picker = document.getElementById('m-hf-picker');
+  const btn = document.getElementById('m-hf-btn');
+  btn.disabled = !picker.value;
+}
 // Download a .gguf from Hugging Face, polling progress until done.
 let dlPoll = null;
 async function startDownload(){
-  const url = document.getElementById('m-hf-url').value.trim();
-  if(!url){ toast('colle un lien .gguf'); return; }
+  let url = document.getElementById('m-hf-url').value.trim();
+  if(!url){ toast('colle un lien .gguf ou une page Hugging Face'); return; }
+  // Si un fichier est sélectionné dans le picker HF, construire le lien direct
+  const picker = document.getElementById('m-hf-picker');
+  if(picker && picker.value){
+    const base = url.replace(/\/?$/, '');
+    url = base + '/resolve/main/' + picker.value;
+  }
   const btn = document.getElementById('m-hf-btn');
   const prog = document.getElementById('m-hf-progress');
   btn.disabled = true;
@@ -1789,7 +1848,8 @@ function lcRenderMode(mode, installed){
   if(installed){
     state.innerHTML = '<span class="lc-mode-active-tag">✓ installée</span>'
       + '<span class="lc-update-link" onclick="event.stopPropagation();lcUpdate(\''+mode+'\')">↻ mettre à jour</span>'
-      + check;
+      + check
+      + '<span class="lc-del-link" onclick="event.stopPropagation();lcDelete(\''+mode+'\')">🗑 supprimer</span>';
   } else {
     state.innerHTML = '<span class="lc-mode-go">→ cliquer pour installer</span>' + check;
   }
@@ -1846,6 +1906,15 @@ async function lcUpdate(mode){
     if(!r.ok){ toast('erreur : '+(r.error||'')); return; }
   }
   lcStartPolling();
+}
+// Supprimer un moteur installé.
+async function lcDelete(mode){
+  const label = mode==='fast' ? 'rapide' : 'optimisée';
+  if(!await askConfirm('Supprimer définitivement la version '+label+' de llama.cpp (binaires + dossier) ?', {title:'Supprimer le moteur', okText:'Supprimer', danger:true})) return;
+  const r = await jpost('/api/llamacpp/delete', {mode});
+  if(!r.ok){ toast('erreur : '+(r.error||'')); return; }
+  toast('version '+label+' supprimée');
+  loadLlamacpp();
 }
 
 // --- Progression de l'installation (téléchargement / compilation) ----------

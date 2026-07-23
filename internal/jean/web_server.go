@@ -86,6 +86,7 @@ func newWebMux() *http.ServeMux {
 	api("/api/update/apply", handleUpdateApply)
 	api("/api/models", handleModels)
 	api("/api/models/delete", handleModelDelete)
+	api("/api/models/hf-files", handleHFFiles)
 	api("/api/models/download", handleModelDownload)
 	api("/api/models/download/status", handleModelDownloadStatus)
 	api("/api/backends", handleBackends)
@@ -96,7 +97,8 @@ func newWebMux() *http.ServeMux {
 	api("/api/llamacpp/job", handleLlamacppJob)                      // progression + logs du job
 	api("/api/llamacpp/prebuilt", handleLlamacppPrebuilt)            // job : binaires officiels précompilés
 	api("/api/llamacpp/prebuilt/check", handleLlamacppPrebuiltCheck) // dernière release officielle vs installée
-	api("/api/llamacpp/use", handleLlamacppUse)                      // bascule BIN entre versions déjà installées
+	api("/api/llamacpp/use", handleLlamacppUse)
+	api("/api/llamacpp/delete", handleLlamacppDelete)                      // bascule BIN entre versions déjà installées
 	api("/api/presets", handlePresets)
 	api("/api/preset", handlePreset)
 	api("/api/preset/save", handlePresetSave)

@@ -267,11 +267,65 @@ async function delItem(){
   } else { toast('supprimé'); }
   closeModal(); K.reload();
 }
+// Détecte si l'URL colle est une page de modèle HF (pas un lien .gguf direct).
+function isHFPageURL(url){
+  try{
+    const u = new URL(url);
+    return u.hostname.includes('huggingface.co') && !url.match(/\.gguf/i);
+  }catch(_){ return false; }
+}
+// Extrait l'ID du repo depuis une URL de page HF.
+function repoIDFromURL(url){
+  try{
+    const u = new URL(url);
+    return u.pathname.replace(/^\/|\/$/g, '');
+  }catch(_){ return ''; }
+}
+let hfFilesCache = [];
+async function onHFUrlChange(){
+  const url = document.getElementById('m-hf-url').value.trim();
+  const pickerWrap = document.getElementById('m-hf-files');
+  const picker = document.getElementById('m-hf-picker');
+  const btn = document.getElementById('m-hf-btn');
+  if(isHFPageURL(url)){
+    const repo = repoIDFromURL(url);
+    if(!repo){ pickerWrap.style.display='none'; return; }
+    btn.disabled = true;
+    picker.innerHTML = '<option>chargement…</option>';
+    pickerWrap.style.display = 'block';
+    const files = await jget('/api/models/hf-files?repo='+encodeURIComponent(repo));
+    if(!Array.isArray(files) || !files.length){
+      picker.innerHTML = '<option>aucun fichier .gguf trouvé</option>';
+      hfFilesCache = [];
+      return;
+    }
+    hfFilesCache = files;
+    let html = '<option value="">— choisir une quantization —</option>';
+    for(const f of files) html += '<option value="'+f.name+'">'+f.name+'  ('+fmtSize(f.size)+')</option>';
+    picker.innerHTML = html;
+    btn.disabled = true;
+  } else {
+    pickerWrap.style.display = 'none';
+    hfFilesCache = [];
+    btn.disabled = false;
+  }
+}
+function onHFPickFile(){
+  const picker = document.getElementById('m-hf-picker');
+  const btn = document.getElementById('m-hf-btn');
+  btn.disabled = !picker.value;
+}
 // Download a .gguf from Hugging Face, polling progress until done.
 let dlPoll = null;
 async function startDownload(){
-  const url = document.getElementById('m-hf-url').value.trim();
-  if(!url){ toast('colle un lien .gguf'); return; }
+  let url = document.getElementById('m-hf-url').value.trim();
+  if(!url){ toast('colle un lien .gguf ou une page Hugging Face'); return; }
+  // Si un fichier est sélectionné dans le picker HF, construire le lien direct
+  const picker = document.getElementById('m-hf-picker');
+  if(picker && picker.value){
+    const base = url.replace(/\/?$/, '');
+    url = base + '/resolve/main/' + picker.value;
+  }
   const btn = document.getElementById('m-hf-btn');
   const prog = document.getElementById('m-hf-progress');
   btn.disabled = true;

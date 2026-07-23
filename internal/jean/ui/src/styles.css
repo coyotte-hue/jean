@@ -288,6 +288,8 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .lc-mode-active-tag{color:var(--accent);font-weight:600}
 .lc-update-link{color:var(--dim);text-decoration:underline;cursor:pointer}
 .lc-update-link:hover{color:var(--accent)}
+.lc-del-link{color:var(--err);text-decoration:underline;cursor:pointer;margin-left:8px;opacity:.7}
+.lc-del-link:hover{opacity:1}
 /* Choix du moteur dans l'éditeur de modèle (3 options : rapide/optimisé/perso) */
 .be-opts{display:flex;flex-direction:column;gap:7px;margin:6px 0 8px}
 .be-opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}

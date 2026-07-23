@@ -40,7 +40,8 @@ function lcRenderMode(mode, installed){
   if(installed){
     state.innerHTML = '<span class="lc-mode-active-tag">✓ installée</span>'
       + '<span class="lc-update-link" onclick="event.stopPropagation();lcUpdate(\''+mode+'\')">↻ mettre à jour</span>'
-      + check;
+      + check
+      + '<span class="lc-del-link" onclick="event.stopPropagation();lcDelete(\''+mode+'\')">🗑 supprimer</span>';
   } else {
     state.innerHTML = '<span class="lc-mode-go">→ cliquer pour installer</span>' + check;
   }
@@ -97,6 +98,15 @@ async function lcUpdate(mode){
     if(!r.ok){ toast('erreur : '+(r.error||'')); return; }
   }
   lcStartPolling();
+}
+// Supprimer un moteur installé.
+async function lcDelete(mode){
+  const label = mode==='fast' ? 'rapide' : 'optimisée';
+  if(!await askConfirm('Supprimer définitivement la version '+label+' de llama.cpp (binaires + dossier) ?', {title:'Supprimer le moteur', okText:'Supprimer', danger:true})) return;
+  const r = await jpost('/api/llamacpp/delete', {mode});
+  if(!r.ok){ toast('erreur : '+(r.error||'')); return; }
+  toast('version '+label+' supprimée');
+  loadLlamacpp();
 }
 
 // --- Progression de l'installation (téléchargement / compilation) ----------
